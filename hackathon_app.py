@@ -2,7 +2,12 @@ import textwrap
 
 import streamlit as st
 
-from hackathon_utils import collect_python_files_from_directory, generate_diff, load_uploaded_python_files
+from hackathon_utils import (
+    clone_github_repo,
+    collect_python_files_from_directory,
+    generate_diff,
+    load_uploaded_python_files,
+)
 from reviewer_engine import analyze_project
 
 
@@ -15,7 +20,7 @@ with st.sidebar:
     st.header("Inputs")
     review_mode = st.radio(
         "Choose analysis mode",
-        options=["Paste code", "Upload files", "Analyze local folder"],
+        options=["Paste code", "Upload files", "Analyze local folder", "GitHub URL"],
     )
     st.markdown(
         """
@@ -44,25 +49,54 @@ elif review_mode == "Upload files":
     sources = load_uploaded_python_files(uploaded_files)
 
 else:
-    folder_path = st.text_input("Local project path", value="D:\\code_review")
-    max_files = st.slider("Max files", min_value=1, max_value=20, value=8)
-    if folder_path.strip():
-        sources = collect_python_files_from_directory(folder_path, max_files=max_files)
-        if folder_path.strip() and not sources:
-            st.warning("No Python files found in that folder, or the folder is inaccessible.")
+    if review_mode == "Analyze local folder":
+        folder_path = st.text_input("Local project path", value="D:\\code_review")
+        max_files = st.slider("Max files", min_value=1, max_value=20, value=8)
+        if folder_path.strip():
+            sources = collect_python_files_from_directory(folder_path, max_files=max_files)
+            if folder_path.strip() and not sources:
+                st.warning("No Python files found in that folder, or the folder is inaccessible.")
+    else:
+        github_url = st.text_input("GitHub repository URL", placeholder="https://github.com/owner/repo")
+        max_files = st.slider("Max files", min_value=1, max_value=20, value=8)
+        if github_url.strip():
+            st.info("The repo will be cloned when you click Analyze Project.")
 
 analyze_clicked = st.button("Analyze Project", type="primary", use_container_width=True)
 
 if analyze_clicked:
     if not sources:
-        st.error("Provide Python code, upload files, or point to a folder with Python files.")
-    else:
+        if review_mode == "GitHub URL":
+            if not github_url.strip():
+                st.error("Enter a GitHub repository URL before running analysis.")
+            else:
+                with st.status("Agent loop running...", expanded=True) as status:
+                    st.write("Step 1: cloning repository from GitHub")
+                    repo_dir, clone_error = clone_github_repo(github_url)
+                    if clone_error:
+                        status.update(label="Clone failed", state="error")
+                        st.error(clone_error)
+                    else:
+                        st.write("Step 2: extracting Python files")
+                        sources = collect_python_files_from_directory(repo_dir, max_files=max_files)
+                        if not sources:
+                            status.update(label="No reviewable files found", state="error")
+                            st.error("The cloned repository did not contain any Python files to review.")
+                        else:
+                            st.write("Step 3: reviewing files one by one")
+                            st.write("Step 4: combining the report")
+                            review = analyze_project(sources)
+                            status.update(label="Review complete", state="complete")
+        else:
+            st.error("Provide Python code, upload files, or point to a folder with Python files.")
+    if sources:
         with st.status("Agent loop running...", expanded=True) as status:
-            st.write("Step 1: ingesting sources")
-            st.write("Step 2: running AST heuristics and PyLint")
-            st.write("Step 3: requesting optional LLM review")
-            st.write("Step 4: validating suggested improvements")
-            review = analyze_project(sources)
+            if review_mode != "GitHub URL":
+                st.write("Step 1: ingesting sources")
+                st.write("Step 2: running AST heuristics and PyLint")
+                st.write("Step 3: requesting optional LLM review")
+                st.write("Step 4: validating suggested improvements")
+                review = analyze_project(sources)
             status.update(label="Review complete", state="complete")
 
         summary = review["project_summary"]

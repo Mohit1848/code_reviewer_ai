@@ -1,4 +1,7 @@
 import difflib
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 
 
@@ -40,3 +43,33 @@ def load_uploaded_python_files(uploaded_files) -> list[tuple[str, str]]:
             continue
         sources.append((uploaded_file.name, uploaded_file.getvalue().decode("utf-8")))
     return sources
+
+
+def clone_github_repo(repo_url: str) -> tuple[str | None, str | None]:
+    if not repo_url.strip():
+        return None, "Enter a GitHub repository URL."
+
+    git_path = shutil.which("git")
+    if not git_path:
+        return None, "Git is not installed or not available on PATH."
+
+    temp_dir = tempfile.mkdtemp(prefix="agentic-review-")
+    target_dir = str(Path(temp_dir) / "repo")
+
+    try:
+        result = subprocess.run(
+            [git_path, "clone", "--depth", "1", repo_url, target_dir],
+            capture_output=True,
+            text=True,
+            timeout=90,
+        )
+    except subprocess.TimeoutExpired:
+        return None, "Cloning the repository timed out."
+    except Exception as exc:
+        return None, f"Failed to clone repository: {exc}"
+
+    if result.returncode != 0:
+        error_text = (result.stderr or result.stdout).strip() or "Git clone failed."
+        return None, error_text
+
+    return target_dir, None
