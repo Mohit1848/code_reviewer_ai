@@ -1,4 +1,5 @@
 streamlit
 requests
 pylint
-.\test\Scripts\python.exe -m streamlit run hackathon_app.py
+python-dotenv
+huggingface_hub
