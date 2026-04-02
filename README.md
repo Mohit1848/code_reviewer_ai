@@ -5,7 +5,7 @@ Hackathon-ready Streamlit app that reviews source code with:
 - Deep Python-specific AST checks
 - PyLint findings for Python
 - Generic model-assisted review for other languages
-- Hugging Face powered semantic review with `deepseek-ai/DeepSeek-R1`
+- Hugging Face powered semantic review with `meta-llama/Llama-3.1-8B-Instruct:novita`
 - Suggested improved code
 - Validation and before/after scoring
 
@@ -22,7 +22,7 @@ Set these environment variables before launching the app:
 
 ```powershell
 $env:HF_TOKEN="your-hugging-face-token"
-$env:HF_MODEL="deepseek-ai/DeepSeek-R1"
+$env:HF_MODEL="meta-llama/Llama-3.1-8B-Instruct:novita"
 $env:HF_API_BASE="https://router.huggingface.co/v1"
 $env:HF_ENDPOINT_URL=""
 ```
@@ -31,7 +31,7 @@ Or create a `.env` file in the project root:
 
 ```env
 HF_TOKEN=your-hugging-face-token
-HF_MODEL=deepseek-ai/DeepSeek-R1
+HF_MODEL=meta-llama/Llama-3.1-8B-Instruct:novita
 HF_API_BASE=https://router.huggingface.co/v1
 HF_ENDPOINT_URL=
 ```

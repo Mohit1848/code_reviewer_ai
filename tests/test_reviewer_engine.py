@@ -18,7 +18,7 @@ def test_analyze_python_file_flags_syntax_error():
     review = analyze_python_file("def broken(:\n    pass\n", "broken.py")
 
     assert any(issue.title == "Syntax error" for issue in review.issues)
-    assert any(issue.title == "Syntax error" for issue in review.issues)
+    assert review.validation["status"] == "failed"
 
 
 def test_analyze_project_returns_summary_counts(monkeypatch):
@@ -42,13 +42,13 @@ def test_analyze_python_file_preserves_valid_code_when_llm_is_disabled(monkeypat
 
 def test_get_llm_config_defaults_to_hugging_face(monkeypatch):
     _disable_llm(monkeypatch)
-    monkeypatch.setenv("HF_MODEL", "deepseek-ai/DeepSeek-R1")
+    monkeypatch.setenv("HF_MODEL", "meta-llama/Llama-3.1-8B-Instruct:novita")
     monkeypatch.setenv("HF_API_BASE", "https://router.huggingface.co/v1")
 
     config = get_llm_config()
 
     assert config["provider"] == "Hugging Face Inference Providers"
-    assert config["model"] == "deepseek-ai/DeepSeek-R1"
+    assert config["model"] == "meta-llama/Llama-3.1-8B-Instruct:novita"
     assert config["api_base"] == "https://router.huggingface.co/v1"
     assert config["api_key"] == ""
     assert config["endpoint_url"] == ""

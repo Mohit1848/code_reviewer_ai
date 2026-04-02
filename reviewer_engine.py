@@ -499,7 +499,7 @@ def _issue_fingerprint(issue: ReviewIssue) -> str:
     return f"{issue.title}|{issue.details}"
 
 
-def _issue_strength(issue: ReviewIssue) -> tuple[int, int]:
+def _issue_strength(issue: ReviewIssue) -> tuple[int, int, int]:
     severity_rank = {"high": 0, "medium": 1, "low": 2}
     source_rank = {"snippet.py": 0}
     title = issue.title.lower()

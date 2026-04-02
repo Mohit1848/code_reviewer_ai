@@ -1,5 +1,9 @@
 __pycache__/
 *.pyc
-test/
 .env
+.venv/
+venv/
+.pytest_cache/
 .streamlit/
+.vscode/
+*.egg-info/

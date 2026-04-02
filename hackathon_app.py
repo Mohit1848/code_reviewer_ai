@@ -10,10 +10,10 @@ from hackathon_utils import (
     load_uploaded_reviewable_files,
     render_code_panel,
 )
-from reviewer_engine import analyze_project, get_llm_config
+from reviewer_engine import analyze_project, detect_language, get_llm_config
 
 
-st.set_page_config(page_title="Agentic AI Code Reviewer", layout="wide")
+st.set_page_config(page_title="NeuroCode", layout="wide", initial_sidebar_state="collapsed")
 
 DEMO_SNIPPETS = {
     "Python": (
@@ -253,37 +253,92 @@ def inject_styles(t: dict[str, str]) -> None:
             }}
             .block-container {{ padding-top: 0.65rem; padding-bottom: 2rem; }}
             [data-testid="stSidebar"] {{
-                background:
-                    linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%),
-                    {t["card"]};
-                border-right: 1px solid {t["border"]};
+                display: none !important;
             }}
-            [data-testid="stSidebar"] > div:first-child {{
-                background: transparent;
+            .floating-controls {{
+                display: flex;
+                justify-content: flex-end;
+                margin: 0.2rem 0 0.8rem 0;
+                position: relative;
+                z-index: 5;
             }}
-            [data-testid="stSidebar"], [data-testid="stSidebar"] * {{
-                color: {t["text"]};
+            .floating-controls [data-testid="stPopover"] > div > button {{
+                border-radius: 999px !important;
+                border: 1px solid {t["strong_border"]} !important;
+                background: linear-gradient(180deg, color-mix(in srgb, {t["accent"]} 22%, {t["card"]}) 0%, {t["card"]} 100%) !important;
+                color: {t["text"]} !important;
+                box-shadow: 0 10px 24px color-mix(in srgb, {t["accent"]} 18%, transparent) !important;
+                font-weight: 700 !important;
+                min-height: 2.65rem !important;
+                padding: 0.45rem 0.95rem !important;
+                opacity: 1 !important;
             }}
-            [data-testid="stSidebar"] .sidebar-title {{
-                margin: 0 0 0.2rem 0;
-                font-size: 1.2rem;
-                font-weight: 700;
-                color: {t["text"]};
-                letter-spacing: -0.02em;
+            .floating-controls [data-testid="stPopover"] > div > button * {{
+                color: {t["text"]} !important;
+                fill: {t["text"]} !important;
+                opacity: 1 !important;
+                -webkit-text-fill-color: {t["text"]} !important;
             }}
-            [data-testid="stSidebar"] .sidebar-copy {{
-                margin: 0 0 1rem 0;
-                color: {t["muted"]};
-                font-size: 0.92rem;
-                line-height: 1.45;
+            .floating-controls [data-testid="stPopover"] > div > button:hover {{
+                filter: brightness(1.05);
+                border-color: color-mix(in srgb, {t["accent"]} 42%, white) !important;
             }}
-            [data-testid="stSidebar"] .sidebar-label {{
-                margin: 0.85rem 0 0.4rem 0;
+            [data-testid="stPopoverContent"] {{
+                background: {t["card"]} !important;
+                border: 1px solid {t["strong_border"]} !important;
+                border-radius: 22px !important;
+                box-shadow: {t["card_shadow"]} !important;
+                backdrop-filter: blur(20px) !important;
+            }}
+            [data-testid="stPopoverContent"] > div {{
+                background: transparent !important;
+            }}
+            [data-testid="stPopoverContent"],
+            [data-testid="stPopoverContent"] * {{
+                color: {t["text"]} !important;
+            }}
+            .floating-controls-panel {{
+                min-width: 280px;
+            }}
+            .floating-label {{
+                margin: 0.5rem 0 0.35rem 0;
                 color: {t["muted"]};
                 font-size: 0.78rem;
                 font-weight: 700;
                 letter-spacing: 0.06em;
                 text-transform: uppercase;
+            }}
+            [data-testid="stPopoverContent"] [data-baseweb="select"] > div {{
+                background: linear-gradient(180deg, color-mix(in srgb, {t["accent"]} 12%, {t["input_bg"]}) 0%, {t["input_bg"]} 100%) !important;
+                border: 1px solid {t["strong_border"]} !important;
+                border-radius: 18px !important;
+                color: {t["text"]} !important;
+                box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 10px 22px color-mix(in srgb, {t["accent"]} 10%, transparent) !important;
+            }}
+            [data-testid="stPopoverContent"] [data-baseweb="select"] * {{
+                color: {t["text"]} !important;
+                fill: {t["text"]} !important;
+            }}
+            [data-testid="stPopoverContent"] [data-baseweb="radio"] > div,
+            [data-testid="stPopoverContent"] [data-baseweb="tab-list"] {{
+                gap: 0.45rem;
+                flex-wrap: wrap;
+            }}
+            [data-testid="stPopoverContent"] [data-baseweb="radio"] label,
+            [data-testid="stPopoverContent"] button[kind="segmented_control"] {{
+                background: linear-gradient(180deg, color-mix(in srgb, {t["accent"]} 10%, {t["input_bg"]}) 0%, {t["input_bg"]} 100%) !important;
+                border: 1px solid {t["border"]} !important;
+                border-radius: 14px !important;
+                padding: 0.35rem 0.85rem !important;
+                color: {t["text"]} !important;
+                box-shadow: none !important;
+            }}
+            [data-testid="stPopoverContent"] [data-baseweb="radio"] input:checked + div,
+            [data-testid="stPopoverContent"] button[kind="segmented_control"][aria-pressed="true"] {{
+                background: linear-gradient(180deg, {t["accent"]} 0%, color-mix(in srgb, {t["accent"]} 82%, black) 100%) !important;
+                border-color: color-mix(in srgb, {t["accent"]} 42%, white) !important;
+                color: white !important;
+                box-shadow: 0 10px 24px color-mix(in srgb, {t["accent"]} 24%, transparent) !important;
             }}
             .app-shell {{
                 background: {t["shell"]};
@@ -302,6 +357,81 @@ def inject_styles(t: dict[str, str]) -> None:
                 height: 140px;
                 background: {t["gloss"]};
                 pointer-events: none;
+            }}
+            .brand-shell {{
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 1rem;
+                margin: 0.25rem 0 1rem 0;
+                padding: 1.05rem 1.1rem;
+                background: linear-gradient(135deg, color-mix(in srgb, {t["accent"]} 18%, transparent) 0%, rgba(255,255,255,0.02) 100%);
+                border: 1px solid {t["strong_border"]};
+                border-radius: 22px;
+                box-shadow: {t["card_shadow"]};
+                position: relative;
+                overflow: hidden;
+            }}
+            .brand-shell::before {{
+                content: "";
+                position: absolute;
+                inset: 0;
+                background: radial-gradient(circle at top left, color-mix(in srgb, {t["accent"]} 26%, transparent), transparent 42%);
+                opacity: 0.9;
+                pointer-events: none;
+            }}
+            .brand-copy {{
+                position: relative;
+                z-index: 1;
+            }}
+            .brand-kicker {{
+                margin: 0 0 0.35rem 0;
+                color: {t["muted"]};
+                font-size: 0.76rem;
+                font-weight: 800;
+                text-transform: uppercase;
+                letter-spacing: 0.12em;
+            }}
+            .brand-title {{
+                margin: 0;
+                font-size: clamp(1.8rem, 4vw, 2.7rem);
+                font-weight: 800;
+                line-height: 1;
+                letter-spacing: -0.04em;
+                background: linear-gradient(90deg, {t["text"]} 0%, color-mix(in srgb, {t["accent"]} 72%, white) 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }}
+            .brand-title span {{
+                text-shadow: 0 0 28px color-mix(in srgb, {t["accent"]} 18%, transparent);
+            }}
+            .brand-subtitle {{
+                margin: 0.45rem 0 0 0;
+                color: {t["muted"]};
+                font-size: 0.96rem;
+                line-height: 1.55;
+                max-width: 780px;
+            }}
+            .brand-chip-row {{
+                position: relative;
+                z-index: 1;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+                justify-content: flex-end;
+            }}
+            .brand-chip {{
+                display: inline-flex;
+                align-items: center;
+                gap: 0.35rem;
+                padding: 0.42rem 0.75rem;
+                border-radius: 999px;
+                background: color-mix(in srgb, {t["accent"]} 14%, {t["card"]});
+                border: 1px solid {t["strong_border"]};
+                color: {t["text"]};
+                font-size: 0.78rem;
+                font-weight: 700;
+                box-shadow: 0 0 0 1px rgba(255,255,255,0.03) inset;
             }}
             .panel, .metric, .issue, .status, .compare-box {{
                 background: {t["card"]};
@@ -336,7 +466,15 @@ def inject_styles(t: dict[str, str]) -> None:
             .severity-high {{ background: rgba(239,68,68,0.12); color: #ef4444; }}
             .severity-medium {{ background: rgba(245,158,11,0.12); color: #d97706; }}
             .severity-low {{ background: rgba(59,130,246,0.12); color: #3b82f6; }}
-            .issue {{ padding: 1rem; margin-bottom: 0.75rem; }}
+            .source-badge {{ display: inline-block; margin-left: 0.45rem; padding: 0.24rem 0.5rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; background: {t["accent_soft"]}; color: {t["accent"]}; }}
+            .summary-strip {{ position: sticky; top: 0.75rem; z-index: 5; margin: 0 0 1rem 0; padding: 0.85rem 1rem; display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; }}
+            .summary-strip .section-title {{ margin: 0; }}
+            .summary-chips {{ display: flex; flex-wrap: wrap; gap: 0.55rem; }}
+            .summary-chip {{ display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.42rem 0.7rem; border-radius: 999px; border: 1px solid {t["border"]}; background: {t["card"]}; color: {t["muted"]}; font-size: 0.82rem; font-weight: 700; }}
+            .issue {{ padding: 1rem; margin-bottom: 0.75rem; border-left: 4px solid transparent; }}
+            .issue-high {{ border-left-color: #ef4444; }}
+            .issue-medium {{ border-left-color: #d97706; }}
+            .issue-low {{ border-left-color: #3b82f6; }}
             .issue-head {{ display: flex; justify-content: space-between; gap: 0.75rem; align-items: flex-start; margin-bottom: 0.5rem; }}
             .issue-title {{ margin: 0; color: {t["text"]}; font-size: 1rem; font-weight: 700; }}
             .critical-item {{ padding: 0.82rem 0.9rem; border-radius: 16px; border: 1px solid {t["border"]}; background: {t["card"]}; margin-bottom: 0.6rem; }}
@@ -440,6 +578,37 @@ def inject_styles(t: dict[str, str]) -> None:
                 border-color: color-mix(in srgb, white 28%, {t["accent"]});
                 filter: brightness(1.04);
             }}
+            .floating-controls [data-testid="stPopover"] button p,
+            .floating-controls [data-testid="stPopover"] button span,
+            .floating-controls [data-testid="stPopover"] button svg,
+            .floating-controls [data-testid="stPopover"] button div {{
+                color: {t["text"]} !important;
+                fill: {t["text"]} !important;
+                stroke: {t["text"]} !important;
+                opacity: 1 !important;
+                -webkit-text-fill-color: {t["text"]} !important;
+            }}
+            .stTabs [data-baseweb="tab-list"] {{
+                gap: 0.5rem;
+            }}
+            .stTabs [data-baseweb="tab"] {{
+                color: {t["muted"]} !important;
+                opacity: 1 !important;
+                font-weight: 700 !important;
+            }}
+            .stTabs [data-baseweb="tab"] * {{
+                color: inherit !important;
+                fill: currentColor !important;
+                opacity: 1 !important;
+                -webkit-text-fill-color: currentColor !important;
+            }}
+            .stTabs [aria-selected="true"] {{
+                color: {t["text"]} !important;
+                text-shadow: 0 0 12px color-mix(in srgb, {t["accent"]} 20%, transparent);
+            }}
+            .stTabs [aria-selected="false"] {{
+                color: {t["muted"]} !important;
+            }}
             .stMarkdown, .stText, label, p, span, div {{
                 color: inherit;
             }}
@@ -534,6 +703,8 @@ def inject_styles(t: dict[str, str]) -> None:
             }}
             @media (max-width: 900px) {{
                 .style-grid {{ grid-template-columns: 1fr; }}
+                .brand-shell {{ flex-direction: column; }}
+                .brand-chip-row {{ justify-content: flex-start; }}
             }}
         </style>
         """,
@@ -559,6 +730,68 @@ def severity_pill(severity: str) -> str:
     return f'<span class="severity severity-{severity}">{severity}</span>'
 
 
+def source_badge(issue: dict[str, str]) -> str:
+    title = str(issue.get("title", "")).lower()
+    source_name = str(issue.get("source", "")).lower()
+
+    if title.startswith("pylint:") or "pylint" in title:
+        return "PyLint"
+    if source_name.endswith(".py") or source_name.endswith(".js") or source_name.endswith(".java") or source_name.endswith(".cpp") or source_name.endswith(".sql"):
+        if any(keyword in title for keyword in ["eval", "shell=true", "bare except", "unused imports", "zero division", "docstring", "syntax error", "large file", "no obvious static issues", "file opened without context manager", "exception swallowed"]):
+            return "AST"
+    if "semantic review" in title or "llm" in title or "model-assisted" in str(issue.get("details", "")).lower():
+        return "LLM"
+    return "Review"
+
+
+def severity_counts_for(issues: list[dict[str, str]]) -> dict[str, int]:
+    return {
+        "high": sum(1 for issue in issues if issue["severity"] == "high"),
+        "medium": sum(1 for issue in issues if issue["severity"] == "medium"),
+        "low": sum(1 for issue in issues if issue["severity"] == "low"),
+    }
+
+
+def active_model_label(llm_status: dict[str, str | bool]) -> str:
+    if not llm_status.get("enabled"):
+        return "Local-only"
+    return str(llm_status.get("model", "Model review"))
+
+
+def loading_steps(review_mode: str) -> list[tuple[str, str]]:
+    if review_mode == "GitHub URL":
+        return [
+            ("Cloning repository", "Fetching the repository and preparing a reviewable workspace."),
+            ("Collecting files", "Scanning the repo for supported source files and limiting the review set."),
+            ("Running review stages", "Executing static checks, linting, and model-assisted review."),
+            ("Scoring rewrite", "Re-validating the suggested rewrite and preparing the dashboard."),
+        ]
+    return [
+        ("NeuroCode parsing", "Normalizing source files and detecting the active language path."),
+        ("NeuroCode local analysis", "Executing AST checks, linting, and issue prioritization where available."),
+        ("NeuroCode model review", "Requesting semantic review and candidate fixes from Hugging Face when enabled."),
+        ("NeuroCode validation", "Scoring the rewrite and packaging the final report views."),
+    ]
+
+
+
+def brand_header(llm_config: dict[str, str], review_mode: str) -> None:
+    st.markdown(
+        f"""
+        <div class="brand-shell">
+            <div class="brand-copy">
+                <p class="brand-kicker">AI code review console</p>
+                <h1 class="brand-title"><span>NeuroCode</span></h1>
+                <p class="brand-subtitle">Intelligent review, rewrite validation, and export-ready engineering reports for code snippets, folders, and repositories.</p>
+            </div>
+            <div class="brand-chip-row">
+                <span class="brand-chip">{MODE_OPTIONS.get(review_mode, review_mode)}</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 def status_banner(llm_status: dict[str, str | bool]) -> None:
     if llm_status["enabled"] and "completed" in str(llm_status["message"]).lower():
         title = "AI Review Online"
@@ -580,20 +813,23 @@ def status_banner(llm_status: dict[str, str | bool]) -> None:
     )
 
 
-def issue_card(issue: dict[str, str]) -> None:
+def issue_card(issue: dict[str, str], expanded: bool = False) -> None:
     preview = issue["details"][:120].rstrip()
     if len(issue["details"]) > 120:
         preview += "..."
+    provenance = source_badge(issue)
     header = f'{issue["title"]} [{issue["severity"].upper()}]'
-    with st.expander(header, expanded=False):
+    with st.expander(header, expanded=expanded):
         st.markdown(
             f"""
-            <div class="issue">
+            <div class="issue issue-{issue["severity"]}">
                 <div class="issue-head">
-                    <h4 class="issue-title">{issue["title"]}</h4>
+                    <div>
+                        <h4 class="issue-title">{issue["title"]}</h4>
+                        <p class="issue-meta">{issue["category"]} from {issue["source"]}<span class="source-badge">{provenance}</span></p>
+                    </div>
                     {severity_pill(issue["severity"])}
                 </div>
-                <p class="issue-meta">{issue["category"]} from {issue["source"]}</p>
                 <p class="issue-body">{preview}</p>
                 <p class="issue-body">{issue["details"]}</p>
                 <p class="issue-body"><strong>Suggested fix:</strong> {issue["suggestion"]}</p>
@@ -624,6 +860,32 @@ def risk_level(issues: list[dict[str, str]]) -> str:
     if "medium" in severities:
         return "Moderate Risk"
     return "Low Risk"
+
+
+def build_markdown_report(review: dict[str, object]) -> str:
+    summary = review["project_summary"]
+    lines = [
+        "# NeuroCode Report",
+        "",
+        f"- Files analyzed: {summary['files_analyzed']}",
+        f"- Findings detected: {summary['issues_found']}",
+        f"- Score before: {summary['score_before']}",
+        f"- Score after: {summary['score_after']}",
+        "",
+    ]
+    for item in review["file_reviews"]:
+        lines.extend([f"## {item['path']}", "", item['summary'], ""])
+        for issue in item["issues"]:
+            lines.append(f"- [{issue['severity'].upper()}] {issue['title']} ({issue['category']})")
+            lines.append(f"  - {issue['details']}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def build_html_report(review: dict[str, object]) -> str:
+    markdown = build_markdown_report(review)
+    escaped = markdown.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    return f"<html><body style='font-family:Arial,sans-serif;background:#0f172a;color:#e5eefc;padding:32px;'><pre style='white-space:pre-wrap;background:#111827;padding:16px;border-radius:16px;'>{escaped}</pre></body></html>"
 
 
 def loading_panel(message: str, detail: str) -> str:
@@ -666,6 +928,9 @@ def choice_control(label: str, options_map: dict[str, str], key: str, default: s
 
 def compare_view(selected_review: dict[str, object]) -> None:
     rows = build_code_comparison_rows(str(selected_review["original_code"]), str(selected_review["improved_code"]))
+    validation = selected_review["validation"]
+    validation_badge = severity_pill("low" if validation["status"] == "passed" else "high")
+    validation_copy = "Rewrite validates" if validation["status"] == "passed" else "Rewrite needs follow-up"
     left_html = render_code_panel(rows, "left")
     right_html = render_code_panel(rows, "right")
     left, right = st.columns(2)
@@ -675,10 +940,10 @@ def compare_view(selected_review: dict[str, object]) -> None:
             <div class="compare-box">
                 <div class="compare-head compare-danger">
                     <div>
-                        <p class="compare-title">Risky Code</p>
-                        <span class="compare-sub">Original implementation</span>
+                        <p class="compare-title">Before</p>
+                        <span class="compare-sub">Current implementation</span>
                     </div>
-                    {severity_pill("high")}
+                    <span class="summary-chip">Baseline</span>
                 </div>
                 <div class="compare-code">{left_html}</div>
             </div>
@@ -691,10 +956,10 @@ def compare_view(selected_review: dict[str, object]) -> None:
             <div class="compare-box">
                 <div class="compare-head compare-safe">
                     <div>
-                        <p class="compare-title">Improved Code</p>
-                        <span class="compare-sub">Suggested safer rewrite</span>
+                        <p class="compare-title">After</p>
+                        <span class="compare-sub">Candidate rewrite</span>
                     </div>
-                    {severity_pill("low")}
+                    <div>{validation_badge}<span class="source-badge">{validation_copy}</span></div>
                 </div>
                 <div class="compare-code">{right_html}</div>
             </div>
@@ -704,11 +969,18 @@ def compare_view(selected_review: dict[str, object]) -> None:
 
 
 llm_config = get_llm_config()
+review_mode = st.session_state.get("review_mode", "Paste code")
+theme_mode = st.session_state.get("theme_mode", "Light")
 
-with st.sidebar:
-    st.markdown('<p class="sidebar-title">Review Settings</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sidebar-copy">Pick a source mode and switch appearance instantly.</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sidebar-label">Source</p>', unsafe_allow_html=True)
+t = tokens("Executive SaaS", theme_mode)
+inject_styles(t)
+
+st.markdown('<div class="app-shell">', unsafe_allow_html=True)
+sources: list[tuple[str, str]] = []
+st.markdown('<div class="floating-controls">', unsafe_allow_html=True)
+with st.popover("⚙ Settings"):
+    st.markdown('<div class="floating-controls-panel">', unsafe_allow_html=True)
+    st.markdown('<p class="floating-label">Source</p>', unsafe_allow_html=True)
     review_mode = st.selectbox(
         "Source",
         options=list(MODE_OPTIONS.keys()),
@@ -716,18 +988,17 @@ with st.sidebar:
         key="review_mode",
         label_visibility="collapsed",
     )
-    st.markdown('<p class="sidebar-label">Appearance</p>', unsafe_allow_html=True)
-    theme_mode = choice_control("Appearance", THEME_OPTIONS, key="theme_mode", default="Light", horizontal=True)
-
+    st.markdown('<p class="floating-label">Appearance</p>', unsafe_allow_html=True)
+    theme_mode = choice_control("Appearance", THEME_OPTIONS, key="theme_mode", default=theme_mode, horizontal=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
 t = tokens("Executive SaaS", theme_mode)
 inject_styles(t)
-
-st.markdown('<div class="app-shell">', unsafe_allow_html=True)
-sources: list[tuple[str, str]] = []
+brand_header(llm_config, review_mode)
 
 left_spacer, center_input, right_spacer = st.columns([0.08, 0.84, 0.08])
 with center_input:
-    st.markdown('<div class="panel"><p class="section-title">Analysis Intake</p><p class="copy">Choose a source, run the review loop, and present the result as a professional engineering quality report.</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="panel"><p class="section-title">NeuroCode Intake</p><p class="copy">Choose a source, run the review loop, and turn raw code into a polished engineering review report.</p></div>', unsafe_allow_html=True)
     if review_mode == "Paste code":
         demo_left, demo_right = st.columns([0.72, 0.28])
         with demo_right:
@@ -763,52 +1034,69 @@ with center_input:
         max_files = st.slider("Max files", min_value=1, max_value=20, value=8)
         if github_url.strip():
             st.info("The repository will be cloned only when you run analysis.")
-    analyze_clicked = st.button("Analyze Project", type="primary", use_container_width=True)
+    analyze_clicked = st.button("Run NeuroCode Review", type="primary", use_container_width=True)
 
 review: dict[str, object] | None = None
 
 if analyze_clicked:
     loading_placeholder = st.empty()
+    phase_steps = loading_steps(review_mode)
     if not sources:
         if review_mode == "GitHub URL":
             if not github_url.strip():
                 st.error("Enter a GitHub repository URL before running analysis.")
             else:
                 loading_placeholder.markdown(
-                    loading_panel("Analyzing repository", "Cloning the repo, collecting source files, and preparing the review pipeline."),
+                    loading_panel(phase_steps[0][0], phase_steps[0][1]),
                     unsafe_allow_html=True,
                 )
-                with st.status("Agent workflow running...", expanded=True) as status:
-                    st.write("Step 1: cloning repository from GitHub")
+                with st.status("NeuroCode pipeline running...", expanded=True) as status:
+                    st.write(f"Step 1: {phase_steps[0][1]}")
                     repo_dir, clone_error = clone_github_repo(github_url)
                     if clone_error:
                         status.update(label="Clone failed", state="error")
-                        st.error(clone_error)
+                        st.error(f"{clone_error} Try a public repository URL, or retry with a smaller repo.")
                     else:
-                        st.write("Step 2: extracting reviewable source files")
+                        loading_placeholder.markdown(
+                            loading_panel(phase_steps[1][0], phase_steps[1][1]),
+                            unsafe_allow_html=True,
+                        )
+                        st.write(f"Step 2: {phase_steps[1][1]}")
                         sources = collect_reviewable_files_from_directory(repo_dir, max_files=max_files)
                         if not sources:
                             status.update(label="No reviewable files found", state="error")
-                            st.error("The cloned repository did not contain any supported source files to review.")
+                            st.error("The cloned repository did not contain any supported source files to review. Try reducing max files or pointing to a repo with source files in the default branch.")
                         else:
-                            st.write("Step 3: reviewing files and generating fixes")
-                            st.write("Step 4: preparing the executive dashboard")
+                            loading_placeholder.markdown(
+                                loading_panel(phase_steps[2][0], phase_steps[2][1]),
+                                unsafe_allow_html=True,
+                            )
+                            st.write(f"Step 3: {phase_steps[2][1]}")
                             review = analyze_project(sources)
+                            loading_placeholder.markdown(
+                                loading_panel(phase_steps[3][0], phase_steps[3][1]),
+                                unsafe_allow_html=True,
+                            )
+                            st.write(f"Step 4: {phase_steps[3][1]}")
                             status.update(label="Review complete", state="complete")
         else:
-            st.error("Provide Python code, upload files, or point to a folder with Python files.")
+            st.error("Add a code snippet, upload files, or point to a folder before running analysis.")
     if sources and review is None:
         loading_placeholder.markdown(
-            loading_panel("Analyzing source files", "Running language-aware checks, model review, and rewrite validation."),
+            loading_panel(phase_steps[0][0], phase_steps[0][1]),
             unsafe_allow_html=True,
         )
-        with st.status("Agent workflow running...", expanded=True) as status:
+        with st.status("NeuroCode pipeline running...", expanded=True) as status:
             if review_mode != "GitHub URL":
-                st.write("Step 1: ingesting source files")
-                st.write("Step 2: running language-aware review stages")
-                st.write("Step 3: requesting semantic review from Hugging Face")
-                st.write("Step 4: validating the suggested rewrite path")
-                review = analyze_project(sources)
+                for step_index, (title, detail) in enumerate(phase_steps, start=1):
+                    loading_placeholder.markdown(
+                        loading_panel(title, detail),
+                        unsafe_allow_html=True,
+                    )
+                    st.write(f"Step {step_index}: {detail}")
+                    if step_index == 3 or step_index == len(phase_steps):
+                        review = analyze_project(sources)
+                        break
             status.update(label="Review complete", state="complete")
     loading_placeholder.empty()
 
@@ -817,10 +1105,10 @@ if review:
     files = review["file_reviews"]
     llm_status = files[0]["llm_status"] if files else None
 
-    st.markdown("## Risk Overview")
+    st.markdown("## NeuroCode Review Summary")
     metrics = st.columns(4)
     with metrics[0]:
-        metric_card("Files Reviewed", str(summary["files_analyzed"]), "Source files included in this analysis run.")
+        metric_card("Files Reviewed", str(summary["files_analyzed"]), "Source files included in this NeuroCode run.")
     with metrics[1]:
         metric_card("Findings Detected", str(summary["issues_found"]), "Prioritized mix of static, lint, and model-assisted findings.")
     with metrics[2]:
@@ -832,44 +1120,76 @@ if review:
     if llm_status:
         status_banner(llm_status)
 
-    selected_path = st.selectbox("Focus file", options=[item["path"] for item in files], label_visibility="collapsed")
+    selected_path = st.selectbox("Focus file", options=[item["path"] for item in files], label_visibility="collapsed", key="focus_file")
     selected_review = next(item for item in files if item["path"] == selected_path)
+    selected_language, _ = detect_language(selected_review["path"])
     top_findings = selected_review["issues"][:3]
+    validation = selected_review["validation"]
+    severity_counts = severity_counts_for(selected_review["issues"])
 
-    overview_left, overview_right = st.columns([1.1, 0.9])
-    with overview_left:
-        st.markdown('<div class="panel"><p class="section-title">Critical Risks</p><p class="copy">Lead with the findings that would matter most in a review meeting or hackathon demo.</p></div>', unsafe_allow_html=True)
-        critical_html = []
-        for issue in top_findings:
-            critical_html.append(f'<div class="critical-item"><h4>{issue["title"]}</h4><p>{issue["details"]}</p></div>')
-        st.markdown("".join(critical_html), unsafe_allow_html=True)
-    with overview_right:
-        validation = selected_review["validation"]
-        validation_text = "PASS" if validation["status"] == "passed" else "FAIL"
-        st.markdown(f'<div class="panel"><p class="section-title">Review Summary</p><p class="copy">{selected_review["summary"]}</p></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="panel"><p class="section-title">Validation Check</p><p class="note"><strong>{validation_text}</strong>: {validation["details"]}</p></div>', unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div class="panel summary-strip">
+            <div>
+                <p class="section-title">{selected_review['path']}</p>
+                <p class="copy">{selected_review['summary']}</p>
+            </div>
+            <div class="summary-chips">
+                <span class="summary-chip">Language: {selected_language}</span>
+                <span class="summary-chip">Validation: {validation['status'].upper()}</span>
+                <span class="summary-chip">High {severity_counts['high']}</span>
+                <span class="summary-chip">Med {severity_counts['medium']}</span>
+                <span class="summary-chip">Low {severity_counts['low']}</span>
+                <span class="summary-chip">NeuroCode path: {active_model_label(selected_review['llm_status'])}</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-    st.markdown("## Before vs After")
-    st.caption("Changed lines are highlighted so the risky implementation reads as danger and the rewrite reads as safe.")
-    compare_view(selected_review)
+    overview_tab, issues_tab, compare_tab, timeline_tab, export_tab = st.tabs(["Overview", "Issues", "Before / After", "Timeline", "Export"])
 
-    st.markdown("## Agent Workflow")
-    timeline(selected_review["agent_steps"])
+    with overview_tab:
+        overview_left, overview_right = st.columns([1.1, 0.9])
+        with overview_left:
+            st.markdown('<div class="panel"><p class="section-title">Critical Risks</p><p class="copy">Lead with the findings that would matter most in a review meeting or hackathon demo.</p></div>', unsafe_allow_html=True)
+            critical_html = []
+            for issue in top_findings:
+                critical_html.append(f'<div class="critical-item"><h4>{issue["title"]}</h4><p>{issue["details"]}</p></div>')
+            st.markdown("".join(critical_html), unsafe_allow_html=True)
+        with overview_right:
+            validation_text = "PASS" if validation["status"] == "passed" else "FAIL"
+            st.markdown(f'<div class="panel"><p class="section-title">Review Summary</p><p class="copy">{selected_review["summary"]}</p></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="panel"><p class="section-title">Validation Check</p><p class="note"><strong>{validation_text}</strong>: {validation["details"]}</p></div>', unsafe_allow_html=True)
 
-    issues_col, details_col = st.columns([1.05, 0.95])
-    with issues_col:
+    with issues_tab:
         st.markdown("## Issue Breakdown")
-        for issue in selected_review["issues"]:
-            issue_card(issue)
-    with details_col:
+        for idx, issue in enumerate(selected_review["issues"]):
+            issue_card(issue, expanded=idx < 3)
+
+    with compare_tab:
+        st.markdown("## Before vs After")
+        st.caption("Changed lines are highlighted for the original implementation and the suggested rewrite, with validation shown on the rewrite pane.")
+        compare_view(selected_review)
         st.markdown("## Suggested Rewrite")
-        st.code(selected_review["improved_code"], language="python")
-        with st.expander("Open unified diff", expanded=False):
-            st.code(generate_diff(selected_review["original_code"], selected_review["improved_code"]), language="diff")
+        st.code(selected_review["improved_code"], language=selected_language.lower())
+
+    with timeline_tab:
+        st.markdown("## NeuroCode Pipeline")
+        timeline(selected_review["agent_steps"])
         with st.expander("Raw PyLint output", expanded=False):
             st.code(selected_review["lint_output"] or "No PyLint output.")
+
+    with export_tab:
+        st.markdown("## Export NeuroCode Report")
+        report_md = build_markdown_report(review)
+        report_html = build_html_report(review)
+        st.download_button("Download Markdown Report", report_md, file_name="neurocode-report.md", mime="text/markdown", use_container_width=True)
+        st.download_button("Download HTML Report", report_html, file_name="neurocode-report.html", mime="text/html", use_container_width=True)
+        with st.expander("Open unified diff", expanded=False):
+            st.code(generate_diff(selected_review["original_code"], selected_review["improved_code"]), language="diff")
 else:
-    st.markdown("## Risk Overview")
+    st.markdown("## NeuroCode Review Summary")
     st.empty()
 
 st.markdown("</div>", unsafe_allow_html=True)
