@@ -926,6 +926,12 @@ def choice_control(label: str, options_map: dict[str, str], key: str, default: s
     )
 
 
+def has_meaningful_rewrite(selected_review: dict[str, object]) -> bool:
+    original = str(selected_review["original_code"]).strip()
+    improved = str(selected_review["improved_code"]).strip()
+    return bool(improved) and original != improved
+
+
 def compare_view(selected_review: dict[str, object]) -> None:
     rows = build_code_comparison_rows(str(selected_review["original_code"]), str(selected_review["improved_code"]))
     validation = selected_review["validation"]
@@ -1169,10 +1175,19 @@ if review:
 
     with compare_tab:
         st.markdown("## Before vs After")
-        st.caption("Changed lines are highlighted for the original implementation and the suggested rewrite, with validation shown on the rewrite pane.")
-        compare_view(selected_review)
-        st.markdown("## Suggested Rewrite")
-        st.code(selected_review["improved_code"], language=selected_language.lower())
+        if has_meaningful_rewrite(selected_review):
+            st.caption("Changed lines are highlighted for the original implementation and the suggested rewrite, with validation shown on the rewrite pane.")
+            compare_view(selected_review)
+            st.markdown("## Suggested Rewrite")
+            st.code(selected_review["improved_code"], language=selected_language.lower())
+        else:
+            no_rewrite_html = (
+                "<div class=\"panel\"><p class=\"section-title\">No rewrite delta</p>"
+                "<p class=\"copy\">NeuroCode reviewed this file and surfaced findings, but it did not generate a materially different rewrite. The current implementation remains the recommended baseline.</p>"
+                f"<p class=\"note\"><strong>Validation:</strong> {selected_review['validation']['details']}</p></div>"
+            )
+            st.markdown(no_rewrite_html, unsafe_allow_html=True)
+            st.code(selected_review["original_code"], language=selected_language.lower())
 
     with timeline_tab:
         st.markdown("## NeuroCode Pipeline")
@@ -1187,7 +1202,8 @@ if review:
         st.download_button("Download Markdown Report", report_md, file_name="neurocode-report.md", mime="text/markdown", use_container_width=True)
         st.download_button("Download HTML Report", report_html, file_name="neurocode-report.html", mime="text/html", use_container_width=True)
         with st.expander("Open unified diff", expanded=False):
-            st.code(generate_diff(selected_review["original_code"], selected_review["improved_code"]), language="diff")
+            diff_text = generate_diff(selected_review["original_code"], selected_review["improved_code"]) if has_meaningful_rewrite(selected_review) else "No unified diff available because the rewrite matches the current implementation."
+            st.code(diff_text, language="diff")
 else:
     st.markdown("## NeuroCode Review Summary")
     st.empty()
